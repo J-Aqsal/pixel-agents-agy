@@ -29,7 +29,7 @@ import {
   watchLayoutFile,
   writeLayoutToFile,
 } from '../../server/src/layoutPersistence.js';
-import { claudeProvider, copyHookScript } from '../../server/src/providers/index.js';
+import { antigravityProvider, claudeProvider, copyHookScript } from '../../server/src/providers/index.js';
 import { PixelAgentsServer } from '../../server/src/server.js';
 import {
   getProjectDirPath,
@@ -108,7 +108,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     setTerminalAdapter(new VscodeTerminalAdapter());
 
     // Create shared runtime (owns timer Maps, scanners, hook handler, dismissal tracker)
-    this.runtime = new AgentRuntime(this.store, [claudeProvider]);
+    this.runtime = new AgentRuntime(this.store, [claudeProvider, antigravityProvider]);
 
     this.initServer();
   }
@@ -169,6 +169,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           () => this.store.persist(),
           message.folderPath as string | undefined,
           message.bypassPermissions as boolean | undefined,
+          false,
+          message.providerId as string | undefined,
         );
         // Register newly created agent(s) with hook handler
         for (const [id, agent] of this.store) {

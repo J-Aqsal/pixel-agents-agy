@@ -14,18 +14,19 @@ import {
 } from '../../server/src/fileWatcher.js';
 import { loadLayout } from '../../server/src/layoutPersistence.js';
 import { CLAUDE_TERMINAL_NAME_PREFIX } from '../../server/src/providers/hook/claude/constants.js';
-import { claudeProvider } from '../../server/src/providers/index.js';
+import { getHookProvider } from '../../server/src/providerRegistry.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from '../../server/src/timerManager.js';
 import type { AgentState, PersistedAgent } from '../../server/src/types.js';
 
-export function getProjectDirPath(cwd?: string): string {
+export function getProjectDirPath(cwd?: string, providerId: string = 'claude'): string {
   // Fall back to home directory when no workspace folder is open (common on Linux/macOS
   // when VS Code is launched without a folder). The provider's getSessionDirs already
   // implements the Windows case-insensitive fallback for drive-letter casing.
   const workspacePath = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
-  const dirs = claudeProvider.getSessionDirs?.(workspacePath) ?? [];
+  const provider = getHookProvider(providerId);
+  const dirs = provider?.getSessionDirs?.(workspacePath) ?? [];
   if (dirs.length === 0) {
-    throw new Error('claudeProvider.getSessionDirs returned no directories');
+    throw new Error(`${providerId} provider getSessionDirs returned no directories`);
   }
   const projectDir = dirs[0];
   console.log(`[Pixel Agents] Terminal: Project dir: ${workspacePath} → ${projectDir}`);
@@ -48,6 +49,7 @@ export async function launchNewTerminal(
   folderPath?: string,
   bypassPermissions?: boolean,
   suppressShow?: boolean,
+  providerId: string = 'claude',
 ): Promise<void> {
   const folders = vscode.workspace.workspaceFolders;
   // Use home directory as fallback cwd when no workspace is open (common on Linux/macOS).
@@ -56,8 +58,15 @@ export async function launchNewTerminal(
   const cwd = folderPath || folders?.[0]?.uri.fsPath || os.homedir();
   const isMultiRoot = !!(folders && folders.length > 1);
   const idx = nextTerminalIndexRef.current++;
+  
+  const provider = getHookProvider(providerId);
+  if (!provider) {
+    throw new Error(`Provider ${providerId} not found`);
+  }
+  const terminalNamePrefix = provider.displayName || CLAUDE_TERMINAL_NAME_PREFIX;
+
   const terminal = vscode.window.createTerminal({
-    name: `${CLAUDE_TERMINAL_NAME_PREFIX} #${idx}`,
+    name: `${terminalNamePrefix} #${idx}`,
     cwd,
   });
   // When suppressShow is set (auto-spawn + autoShowPanel), keep the panel view
@@ -69,13 +78,13 @@ export async function launchNewTerminal(
   }
 
   const sessionId = crypto.randomUUID();
-  const launch = claudeProvider.buildLaunchCommand?.(sessionId, cwd, { bypassPermissions });
+  const launch = provider.buildLaunchCommand?.(sessionId, cwd, { bypassPermissions });
   if (!launch) {
-    throw new Error('claudeProvider.buildLaunchCommand is not implemented');
+    throw new Error(`${providerId} provider buildLaunchCommand is not implemented`);
   }
   terminal.sendText([launch.command, ...launch.args].join(' '));
 
-  const projectDir = getProjectDirPath(cwd);
+  const projectDir = getProjectDirPath(cwd, providerId);
 
   // Pre-register expected JSONL file so project scan won't treat it as a /clear file
   const expectedFile = path.join(projectDir, `${sessionId}.jsonl`);
@@ -87,6 +96,7 @@ export async function launchNewTerminal(
   const agent: AgentState = {
     id,
     sessionId,
+    providerId,
     terminalRef: terminal,
     isExternal: false,
     projectDir,
