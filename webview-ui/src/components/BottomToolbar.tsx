@@ -8,7 +8,7 @@ import { Dropdown, DropdownItem } from './ui/Dropdown.js';
 
 interface BottomToolbarProps {
   isEditMode: boolean;
-  onOpenClaude: () => void;
+  onLaunchAgent: (providerId: string) => void;
   onToggleEditMode: () => void;
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
@@ -17,7 +17,7 @@ interface BottomToolbarProps {
 
 export function BottomToolbar({
   isEditMode,
-  onOpenClaude,
+  onLaunchAgent,
   onToggleEditMode,
   isSettingsOpen,
   onToggleSettings,
@@ -25,6 +25,7 @@ export function BottomToolbar({
 }: BottomToolbarProps) {
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
   const [isBypassMenuOpen, setIsBypassMenuOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<'claude' | 'antigravity'>('claude');
   const folderPickerRef = useRef<HTMLDivElement>(null);
   const pendingBypassRef = useRef(false);
   // Close folder picker / bypass menu on outside click
@@ -42,18 +43,20 @@ export function BottomToolbar({
 
   const hasMultipleFolders = workspaceFolders.length > 1;
 
-  const handleAgentClick = () => {
+  const handleAgentClick = (providerId: 'claude' | 'antigravity') => {
+    setSelectedProvider(providerId);
     setIsBypassMenuOpen(false);
     pendingBypassRef.current = false;
     if (hasMultipleFolders) {
       setIsFolderPickerOpen((v) => !v);
     } else {
-      onOpenClaude();
+      onLaunchAgent(providerId);
     }
   };
 
-  const handleAgentHover = () => {
+  const handleAgentHover = (providerId: 'claude' | 'antigravity') => {
     if (!isFolderPickerOpen) {
+      setSelectedProvider(providerId);
       setIsBypassMenuOpen(true);
     }
   };
@@ -68,7 +71,7 @@ export function BottomToolbar({
     setIsFolderPickerOpen(false);
     const bypassPermissions = pendingBypassRef.current;
     pendingBypassRef.current = false;
-    transport.send({ type: 'launchAgent', folderPath: folder.path, bypassPermissions });
+    transport.send({ type: 'launchAgent', providerId: selectedProvider, folderPath: folder.path, bypassPermissions });
   };
 
   const handleBypassSelect = (bypassPermissions: boolean) => {
@@ -77,7 +80,7 @@ export function BottomToolbar({
       pendingBypassRef.current = bypassPermissions;
       setIsFolderPickerOpen(true);
     } else {
-      transport.send({ type: 'launchAgent', bypassPermissions });
+      transport.send({ type: 'launchAgent', providerId: selectedProvider, bypassPermissions });
     }
   };
 
@@ -87,20 +90,32 @@ export function BottomToolbar({
       {!isBrowserRuntime && (
         <div
           ref={folderPickerRef}
-          className="relative"
-          onMouseEnter={handleAgentHover}
+          className="relative flex gap-2"
           onMouseLeave={handleAgentLeave}
         >
           <Button
             variant="accent"
-            onClick={handleAgentClick}
+            onMouseEnter={() => handleAgentHover('claude')}
+            onClick={() => handleAgentClick('claude')}
             className={
-              isFolderPickerOpen || isBypassMenuOpen
+              (isFolderPickerOpen || isBypassMenuOpen) && selectedProvider === 'claude'
                 ? 'bg-accent-bright'
                 : 'bg-accent hover:bg-accent-bright'
             }
           >
-            + Agent
+            + Claude
+          </Button>
+          <Button
+            variant="accent"
+            onMouseEnter={() => handleAgentHover('antigravity')}
+            onClick={() => handleAgentClick('antigravity')}
+            className={
+              (isFolderPickerOpen || isBypassMenuOpen) && selectedProvider === 'antigravity'
+                ? 'bg-accent-bright'
+                : 'bg-accent hover:bg-accent-bright'
+            }
+          >
+            + Antigravity
           </Button>
           <Dropdown isOpen={isBypassMenuOpen}>
             <DropdownItem onClick={() => handleBypassSelect(true)}>
