@@ -1,7 +1,7 @@
 const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
 import type { AgentStateStore } from './agentStateStore.js';
-import { getHookProvider } from './providerRegistry.js';
 import { TEXT_IDLE_DELAY_MS, TOOL_DONE_DELAY_MS } from './constants.js';
+import { getHookProvider } from './providerRegistry.js';
 import {
   cancelPermissionTimer,
   cancelWaitingTimer,

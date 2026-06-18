@@ -25,7 +25,6 @@ import type * as vscode from 'vscode';
 const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
 
 import type { ITerminalAdapter } from '../../core/src/terminalAdapter.js';
-import { getHookProvider, getHookProviders } from './providerRegistry.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import {
   CLEAR_IDLE_THRESHOLD_MS,
@@ -38,6 +37,7 @@ import {
   PROJECT_SCAN_INTERVAL_MS,
 } from './constants.js';
 import type { DismissalTracker } from './dismissalTracker.js';
+import { getHookProvider, getHookProviders } from './providerRegistry.js';
 import { cancelPermissionTimer, cancelWaitingTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
 import type { AgentState } from './types.js';
