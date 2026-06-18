@@ -271,6 +271,7 @@ export interface LaunchAgent {
   type: 'launchAgent';
   folderPath?: string;
   bypassPermissions?: boolean;
+  providerId?: string;
 }
 
 export interface FocusAgent {

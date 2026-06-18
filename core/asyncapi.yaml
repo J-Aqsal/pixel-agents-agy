@@ -602,6 +602,9 @@ components:
           description: Workspace folder path (for multi-root workspaces).
         bypassPermissions:
           type: boolean
+        providerId:
+          type: string
+          description: The ID of the provider to launch (e.g., 'claude' or 'antigravity').
 
     FocusAgent:
       description: Focus an agent's terminal.
