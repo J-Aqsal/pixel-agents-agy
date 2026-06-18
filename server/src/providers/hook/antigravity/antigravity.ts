@@ -81,6 +81,7 @@ export const antigravityProvider: HookProvider = {
   kind: 'hook',
   id: 'antigravity',
   displayName: 'Antigravity CLI',
+  terminalNamePrefix: 'Antigravity CLI',
   protocolVersion: 1,
 
   normalizeHookEvent,
