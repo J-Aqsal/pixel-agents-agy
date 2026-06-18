@@ -23,7 +23,6 @@ import {
   scanForTeammateFiles,
   setAgentRemovalCallback,
   setDismissalTracker,
-  setHookProviders as setFileWatcherHookProviders,
   setTeammateRemovalCallback,
   startExternalSessionScanning,
   startFileWatching,
@@ -31,9 +30,9 @@ import {
 } from './fileWatcher.js';
 import type { HookEvent } from './hookEventHandler.js';
 import { HookEventHandler } from './hookEventHandler.js';
+import { setHookProviders } from './providerRegistry.js';
 import { SessionRouter } from './sessionRouter.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
-import { setHookProviders } from './transcriptParser.js';
 import type { AgentState } from './types.js';
 
 /** Callbacks that adapters register for platform-specific behavior. */
@@ -75,7 +74,6 @@ export class AgentRuntime {
     // Wire module-level dependencies
     setDismissalTracker(this.dismissalTracker);
     setHookProviders(providers);
-    setFileWatcherHookProviders(providers);
     setAgentRemovalCallback((id) => this.removeAgent(id));
     setTeammateRemovalCallback((id) => this.removeTeammate(id, 'team-config'));
 
@@ -370,7 +368,7 @@ export class AgentRuntime {
         isTeamLead: p.isTeamLead,
         leadAgentId: p.leadAgentId,
         teamUsesTmux: p.teamUsesTmux,
-        providerId: (p as any).providerId, // Fallback if persisted
+        providerId: p.providerId, // Fallback if persisted
       };
 
       this.store.set(p.id, agent);

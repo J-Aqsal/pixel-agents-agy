@@ -19,6 +19,7 @@ export interface PersistedAgent {
   isTeamLead?: boolean;
   leadAgentId?: number;
   teamUsesTmux?: boolean;
+  providerId?: string;
 }
 
 /** Agent seat assignment with visual identity */

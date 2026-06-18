@@ -78,4 +78,6 @@ export interface PersistedAgent {
   isTeamLead?: boolean;
   leadAgentId?: number;
   teamUsesTmux?: boolean;
+  /** Provider that created this agent (defaults to 'claude') */
+  providerId?: string;
 }

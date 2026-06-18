@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { AgentEvent, HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import { SESSION_END_GRACE_MS } from './constants.js';
+import { getHookProviderOrThrow } from './providerRegistry.js';
 import type { SessionRouter } from './sessionRouter.js';
 import { getInlineTeammates, hasInlineTeammates } from './teamUtils.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
@@ -65,7 +66,7 @@ export class HookEventHandler {
     private agents: AgentStateStore,
     private waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
     private permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
-    private providers: HookProvider[],
+    providers: HookProvider[],
     private sessionRouter: SessionRouter,
     private watchAllSessionsRef?: { current: boolean },
   ) {
@@ -81,9 +82,7 @@ export class HookEventHandler {
   }
 
   private getProvider(providerId?: string): HookProvider {
-    if (this.providers.length === 0) throw new Error('No HookProviders registered');
-    if (!providerId) return this.providers[0];
-    return this.providers.find((p) => p.id === providerId) || this.providers.find((p) => p.id === 'claude') || this.providers[0];
+    return getHookProviderOrThrow(providerId);
   }
 
   /** Merged set of tool names that spawn subagents (teammates + within-turn subagents

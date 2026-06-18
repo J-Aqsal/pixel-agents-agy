@@ -1,7 +1,6 @@
 const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
-
-import type { HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
+import { getHookProvider } from './providerRegistry.js';
 import { TEXT_IDLE_DELAY_MS, TOOL_DONE_DELAY_MS } from './constants.js';
 import {
   cancelPermissionTimer,
@@ -14,21 +13,6 @@ import type { AgentState } from './types.js';
 
 /** Empty set used as safe fallback when no HookProvider is registered. */
 const EMPTY_EXEMPT_TOOLS: ReadonlySet<string> = new Set();
-
-/** Hook providers: supplies formatToolStatus + team.extractTeamMetadataFromRecord.
- *  Registered once at startup via setHookProviders(). Functions below assume it's set. */
-let hookProviders: HookProvider[] = [];
-
-/** Register the HookProviders that own CLI-specific formatting and team metadata extraction. */
-export function setHookProviders(providers: HookProvider[]): void {
-  hookProviders = providers;
-}
-
-export function getHookProvider(providerId?: string): HookProvider | null {
-  if (hookProviders.length === 0) return null;
-  if (!providerId) return hookProviders[0];
-  return hookProviders.find((p) => p.id === providerId) || hookProviders.find((p) => p.id === 'claude') || hookProviders[0];
-}
 
 /** Permission-exempt tools come from the active provider. Fail-open if unset. */
 function exemptTools(providerId?: string): ReadonlySet<string> {

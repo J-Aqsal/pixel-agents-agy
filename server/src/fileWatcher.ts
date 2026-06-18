@@ -24,9 +24,8 @@ import type * as vscode from 'vscode';
 
 const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
 
-import type { HookProvider } from '../../core/src/provider.js';
-import type { TeamProvider } from '../../core/src/teamProvider.js';
 import type { ITerminalAdapter } from '../../core/src/terminalAdapter.js';
+import { getHookProvider, getHookProviders } from './providerRegistry.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import {
   CLEAR_IDLE_THRESHOLD_MS,
@@ -390,7 +389,7 @@ export function scanForNewJsonlFiles(
     const activeTerminal = terminalAdapter?.activeTerminal() as vscode.Terminal | undefined;
     let matchedProviderId: string | undefined;
     if (activeTerminal) {
-      for (const p of hookProviders) {
+      for (const p of getHookProviders()) {
         if (p.terminalNamePrefix && activeTerminal.name.startsWith(p.terminalNamePrefix)) {
           matchedProviderId = p.id;
           break;
@@ -427,7 +426,7 @@ export function scanForNewJsonlFiles(
         // Active terminal is owned -- scan for untracked named terminals.
         for (const terminal of (terminalAdapter?.allTerminals() ?? []) as vscode.Terminal[]) {
           let terminalMatchedProviderId: string | undefined;
-          for (const p of hookProviders) {
+          for (const p of getHookProviders()) {
             if (p.terminalNamePrefix && terminal.name.startsWith(p.terminalNamePrefix)) {
               terminalMatchedProviderId = p.id;
               break;
@@ -557,34 +556,9 @@ const knownTeammateFiles = new Set<string>();
 /** Callback to remove a teammate agent when detected as dismissed via team config. */
 let teammateRemovalCallback: ((teammateAgentId: number) => void) | null = null;
 
-/** Team provider: supplies all CLI-specific paths, parsers, and tool names.
- *  Set once at startup via setTeamProvider(). Module functions assume it's set
- *  by the time they're called. */
-let teamProvider: TeamProvider | null = null;
-
-/** Hook providers: supplies non-team capabilities fileWatcher needs (all-session
- *  roots for global discovery, launch command, etc.). Set once at startup. */
-let hookProviders: HookProvider[] = [];
-
 /** Register the callback used to remove teammates detected as dismissed via team config polling. */
 export function setTeammateRemovalCallback(cb: (teammateAgentId: number) => void): void {
   teammateRemovalCallback = cb;
-}
-
-/** Register the TeamProvider that describes the active CLI's Lead+Teammates pattern. */
-export function setTeamProvider(provider: TeamProvider): void {
-  teamProvider = provider;
-}
-
-/** Register the active HookProviders for non-team capabilities (session roots, etc.). */
-export function setHookProviders(providers: HookProvider[]): void {
-  hookProviders = providers;
-}
-
-export function getHookProvider(providerId?: string): HookProvider | null {
-  if (hookProviders.length === 0) return null;
-  if (!providerId) return hookProviders[0];
-  return hookProviders.find((p) => p.id === providerId) || hookProviders.find((p) => p.id === 'claude') || hookProviders[0];
 }
 
 /**
@@ -609,10 +583,10 @@ export function scanForTeammateFiles(
   persistAgents: () => void,
   onAgentCreated?: (agent: AgentState) => void,
 ): void {
-  if (!teamProvider) return;
-  const teammates = teamProvider.discoverTeammates(projectDir, sessionId);
-
   const parentAgent = agents.get(parentAgentId);
+  const provider = getHookProvider(parentAgent?.providerId);
+  if (!provider?.team) return;
+  const teammates = provider.team.discoverTeammates(projectDir, sessionId);
 
   for (const { jsonlPath: file, teammateName } of teammates) {
     if (knownTeammateFiles.has(file)) continue;
@@ -735,7 +709,6 @@ export function scanForTeammateFiles(
  */
 export function scanTeamConfigsForRemovals(agents: AgentStateStore): number[] {
   const toRemove: number[] = [];
-  if (!teamProvider) return toRemove;
   // Group teammates by their teamName for efficient config lookups
   const teammatesByTeam = new Map<string, Array<{ id: number; agent: AgentState }>>();
   for (const [id, agent] of agents) {
@@ -749,8 +722,12 @@ export function scanTeamConfigsForRemovals(agents: AgentStateStore): number[] {
   }
 
   for (const [teamName, members] of teammatesByTeam) {
+    const providerId = members[0]?.agent.providerId;
+    const provider = getHookProvider(providerId);
+    if (!provider?.team) continue;
+
     // Provider owns both the read and parse -- returns null on any failure (team dissolved)
-    const memberNames = teamProvider.getTeamMembers(teamName);
+    const memberNames = provider.team.getTeamMembers(teamName);
 
     for (const { id, agent } of members) {
       if (memberNames === null) {
@@ -1182,7 +1159,7 @@ function scanGlobalProjectDirs(
   persistAgents: () => void,
 ): void {
   const roots = new Set<string>();
-  for (const provider of hookProviders) {
+  for (const provider of getHookProviders()) {
     if (provider.getAllSessionRoots) {
       for (const root of provider.getAllSessionRoots()) {
         roots.add(root);
