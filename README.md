@@ -54,9 +54,14 @@ This is the source code for the free Pixel Agents extension for VS Code — inst
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured
 - **Platform**: Windows, Linux, and macOS are supported
 
+## 🚀 Antigravity CLI Edition
+
+This is a custom fork that adds support for the **Antigravity CLI** alongside Claude Code! 
+To use this custom version, you can download the `.vsix` file from the [Releases](https://github.com/J-Aqsal/pixel-agents-agy/releases) page and install it in VS Code via the **"Install from VSIX..."** menu in the Extensions panel.
+
 ## Getting Started
 
-If you just want to use Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
+If you just want to use the official Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
 
 ### Install from source
 
