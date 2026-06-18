@@ -23,9 +23,8 @@ import {
   scanForTeammateFiles,
   setAgentRemovalCallback,
   setDismissalTracker,
-  setHookProvider as setFileWatcherHookProvider,
+  setHookProviders as setFileWatcherHookProviders,
   setTeammateRemovalCallback,
-  setTeamProvider,
   startExternalSessionScanning,
   startFileWatching,
   startStaleExternalAgentCheck,
@@ -34,7 +33,7 @@ import type { HookEvent } from './hookEventHandler.js';
 import { HookEventHandler } from './hookEventHandler.js';
 import { SessionRouter } from './sessionRouter.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
-import { setHookProvider } from './transcriptParser.js';
+import { setHookProviders } from './transcriptParser.js';
 import type { AgentState } from './types.js';
 
 /** Callbacks that adapters register for platform-specific behavior. */
@@ -71,15 +70,12 @@ export class AgentRuntime {
 
   constructor(
     private readonly store: AgentStateStore,
-    provider: HookProvider,
+    providers: HookProvider[],
   ) {
     // Wire module-level dependencies
     setDismissalTracker(this.dismissalTracker);
-    setHookProvider(provider);
-    setFileWatcherHookProvider(provider);
-    if (provider.team) {
-      setTeamProvider(provider.team);
-    }
+    setHookProviders(providers);
+    setFileWatcherHookProviders(providers);
     setAgentRemovalCallback((id) => this.removeAgent(id));
     setTeammateRemovalCallback((id) => this.removeTeammate(id, 'team-config'));
 
@@ -87,7 +83,7 @@ export class AgentRuntime {
       store,
       this.waitingTimers,
       this.permissionTimers,
-      provider,
+      providers,
       new SessionRouter(),
       this.watchAllSessions,
     );
@@ -374,6 +370,7 @@ export class AgentRuntime {
         isTeamLead: p.isTeamLead,
         leadAgentId: p.leadAgentId,
         teamUsesTmux: p.teamUsesTmux,
+        providerId: (p as any).providerId, // Fallback if persisted
       };
 
       this.store.set(p.id, agent);

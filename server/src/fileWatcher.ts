@@ -384,15 +384,21 @@ export function scanForNewJsonlFiles(
     // Non-adopted files stay OUT of knownJsonlFiles so the per-agent /clear
     // check can find them when the idle check passes (up to 5s later).
 
-    // Try to adopt the focused terminal (only if it's a Claude-named terminal).
+    // Try to adopt the focused terminal (only if it matches a provider's terminalNamePrefix).
     // Cast to vscode.Terminal because the adapter returns the real object at runtime;
     // the TerminalHandle type is the minimal interface for the adapter contract.
     const activeTerminal = terminalAdapter?.activeTerminal() as vscode.Terminal | undefined;
-    if (
-      activeTerminal &&
-      hookProvider?.terminalNamePrefix &&
-      activeTerminal.name.startsWith(hookProvider.terminalNamePrefix)
-    ) {
+    let matchedProviderId: string | undefined;
+    if (activeTerminal) {
+      for (const p of hookProviders) {
+        if (p.terminalNamePrefix && activeTerminal.name.startsWith(p.terminalNamePrefix)) {
+          matchedProviderId = p.id;
+          break;
+        }
+      }
+    }
+    
+    if (matchedProviderId) {
       let owned = false;
       for (const agent of agents.values()) {
         if (agent.terminalRef === activeTerminal) {
@@ -403,7 +409,7 @@ export function scanForNewJsonlFiles(
       if (!owned) {
         knownJsonlFiles.add(file); // Claimed by terminal adoption
         adoptTerminalForFile(
-          activeTerminal,
+          activeTerminal!,
           file,
           projectDir,
           nextAgentIdRef,
@@ -414,17 +420,20 @@ export function scanForNewJsonlFiles(
           waitingTimers,
           permissionTimers,
           persistAgents,
+          onAgentCreated,
+          matchedProviderId,
         );
       } else {
-        // Active terminal is owned -- scan for untracked Claude-named terminals.
-        // Only adopt terminals with TERMINAL_NAME_PREFIX to avoid grabbing
-        // pre-existing shells ("zsh", "bash") for /clear files.
+        // Active terminal is owned -- scan for untracked named terminals.
         for (const terminal of (terminalAdapter?.allTerminals() ?? []) as vscode.Terminal[]) {
-          if (
-            !hookProvider?.terminalNamePrefix ||
-            !terminal.name.startsWith(hookProvider.terminalNamePrefix)
-          )
-            continue;
+          let terminalMatchedProviderId: string | undefined;
+          for (const p of hookProviders) {
+            if (p.terminalNamePrefix && terminal.name.startsWith(p.terminalNamePrefix)) {
+              terminalMatchedProviderId = p.id;
+              break;
+            }
+          }
+          if (!terminalMatchedProviderId) continue;
           let owned = false;
           for (const agent of agents.values()) {
             if (agent.terminalRef === terminal) {
@@ -447,6 +456,7 @@ export function scanForNewJsonlFiles(
               permissionTimers,
               persistAgents,
               onAgentCreated,
+              terminalMatchedProviderId,
             );
             break;
           }
@@ -479,6 +489,7 @@ function adoptTerminalForFile(
 
   persistAgents: () => void,
   onAgentCreated?: (agent: AgentState) => void,
+  providerId?: string,
 ): void {
   const id = nextAgentIdRef.current++;
   const sessionId = path.basename(jsonlFile, '.jsonl');
@@ -514,6 +525,7 @@ function adoptTerminalForFile(
     hookDelivered: false,
     inputTokens: 0,
     outputTokens: 0,
+    providerId,
   };
 
   agents.set(id, agent);
@@ -550,9 +562,9 @@ let teammateRemovalCallback: ((teammateAgentId: number) => void) | null = null;
  *  by the time they're called. */
 let teamProvider: TeamProvider | null = null;
 
-/** Hook provider: supplies non-team capabilities fileWatcher needs (all-session
+/** Hook providers: supplies non-team capabilities fileWatcher needs (all-session
  *  roots for global discovery, launch command, etc.). Set once at startup. */
-let hookProvider: HookProvider | null = null;
+let hookProviders: HookProvider[] = [];
 
 /** Register the callback used to remove teammates detected as dismissed via team config polling. */
 export function setTeammateRemovalCallback(cb: (teammateAgentId: number) => void): void {
@@ -564,9 +576,15 @@ export function setTeamProvider(provider: TeamProvider): void {
   teamProvider = provider;
 }
 
-/** Register the active HookProvider for non-team capabilities (session roots, etc.). */
-export function setHookProvider(provider: HookProvider): void {
-  hookProvider = provider;
+/** Register the active HookProviders for non-team capabilities (session roots, etc.). */
+export function setHookProviders(providers: HookProvider[]): void {
+  hookProviders = providers;
+}
+
+export function getHookProvider(providerId?: string): HookProvider | null {
+  if (hookProviders.length === 0) return null;
+  if (!providerId) return hookProviders[0];
+  return hookProviders.find((p) => p.id === providerId) || hookProviders.find((p) => p.id === 'claude') || hookProviders[0];
 }
 
 /**
@@ -1163,8 +1181,14 @@ function scanGlobalProjectDirs(
 
   persistAgents: () => void,
 ): void {
-  const roots = hookProvider?.getAllSessionRoots?.() ?? [];
-  if (roots.length === 0) return;
+  const roots = new Set<string>();
+  for (const provider of hookProviders) {
+    if (provider.getAllSessionRoots) {
+      for (const root of provider.getAllSessionRoots()) {
+        roots.add(root);
+      }
+    }
+  }
 
   const projectDirs: string[] = [];
   for (const root of roots) {

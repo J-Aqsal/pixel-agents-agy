@@ -137,6 +137,9 @@ function exportify(decl: string): string {
 }
 
 function quote(s: string): string {
+  if (process.platform === 'win32') {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
   return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
